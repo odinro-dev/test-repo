@@ -14,7 +14,9 @@ const router = Router();
  */
 router.get("/", authenticate, (req: AuthRequest, res: Response) => {
   try {
-    let tasks = db.getAllTasks();
+    // Full-text search
+    const q = req.query.q as string;
+    let tasks = q ? db.searchTasks(q) : db.getAllTasks();
 
     // Filter by status
     const status = req.query.status as string;
@@ -44,7 +46,7 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
     const result = db.paginate(tasks, page, limit);
 
-    logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag } });
+    logger.info("Tasks listed", { count: result.data.length, page, filters: { q, status, priority, assignee, tag } });
     res.json(result);
   } catch (error) {
     logger.error("Failed to list tasks", { error: (error as Error).message });

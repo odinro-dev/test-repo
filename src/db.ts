@@ -26,6 +26,23 @@ class Database {
     return this.getAllTasks().filter((t) => t.assigneeId === assigneeId);
   }
 
+  searchTasks(query: string): Task[] {
+    const lower = query.toLowerCase();
+    return this.getAllTasks()
+      .filter(
+        (t) =>
+          t.title.toLowerCase().includes(lower) ||
+          t.description.toLowerCase().includes(lower) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(lower))
+      )
+      .sort((a, b) => {
+        // Title matches rank higher
+        const aTitle = a.title.toLowerCase().includes(lower) ? 0 : 1;
+        const bTitle = b.title.toLowerCase().includes(lower) ? 0 : 1;
+        return aTitle - bTitle;
+      });
+  }
+
   createTask(task: Task): Task {
     this.tasks.set(task.id, task);
     return task;
