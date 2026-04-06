@@ -13,6 +13,8 @@ The server starts on `http://localhost:3000`.
 
 ## API Endpoints
 
+See [docs/API.md](docs/API.md) for full documentation with request/response examples.
+
 ### Authentication
 - `POST /api/users/register` — Create a new account
 - `POST /api/users/login` — Login and receive a JWT token
@@ -31,6 +33,14 @@ The server starts on `http://localhost:3000`.
 
 ### Health
 - `GET /health` — Health check
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## Environment Variables
 
