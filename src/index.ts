@@ -21,7 +21,11 @@ app.use("/api/users", userRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // 404 handler
@@ -29,10 +33,13 @@ app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-// Error handler
+// Global error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const isProduction = process.env.NODE_ENV === "production";
   logger.error("Unhandled error", { error: err.message, stack: err.stack });
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({
+    error: isProduction ? "Internal server error" : err.message,
+  });
 });
 
 app.listen(PORT, () => {
