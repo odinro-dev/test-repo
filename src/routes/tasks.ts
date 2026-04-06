@@ -44,7 +44,16 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
     const overdue = req.query.overdue as string;
     if (overdue === "true") {
       const now = new Date();
-      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done");
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done" && t.status !== "cancelled");
+    }
+
+    // Filter tasks due soon
+    const dueSoon = req.query.dueSoon as string;
+    if (dueSoon) {
+      const days = parseInt(dueSoon, 10) || 3;
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= cutoff);
     }
 
     // Pagination
