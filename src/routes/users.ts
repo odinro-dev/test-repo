@@ -5,6 +5,7 @@ import { db } from "../db";
 import { CreateUserInput, LoginInput, toPublicUser } from "../models/user";
 import { AuthRequest, authenticate, requireAdmin, generateToken } from "../middleware/auth";
 import { isValidEmail, isNonEmptyString } from "../utils/validation";
+import { sendSuccess, sendError } from "../utils/response";
 import { logger } from "../utils/logger";
 
 const router = Router();
@@ -12,28 +13,31 @@ const router = Router();
 /**
  * POST /users/register
  * Register a new user account.
+ *
+ * Response format changed in v2:
+ * { success: true, data: { user: {...}, token: "..." }, meta: {...} }
  */
 router.post("/register", async (req: Request, res: Response) => {
   const input: CreateUserInput = req.body;
 
   if (!isValidEmail(input.email)) {
-    res.status(400).json({ error: "Invalid email address" });
+    sendError(res, "Invalid email address", 400);
     return;
   }
 
   if (!isNonEmptyString(input.password) || input.password.length < 8) {
-    res.status(400).json({ error: "Password must be at least 8 characters" });
+    sendError(res, "Password must be at least 8 characters", 400);
     return;
   }
 
   if (!isNonEmptyString(input.name)) {
-    res.status(400).json({ error: "Name is required" });
+    sendError(res, "Name is required", 400);
     return;
   }
 
   const existing = db.getUserByEmail(input.email);
   if (existing) {
-    res.status(409).json({ error: "Email already registered" });
+    sendError(res, "Email already registered", 409);
     return;
   }
 
@@ -49,7 +53,7 @@ router.post("/register", async (req: Request, res: Response) => {
 
   const token = generateToken(user.id, user.role);
   logger.info("User registered", { userId: user.id, email: user.email });
-  res.status(201).json({ user: toPublicUser(user), token });
+  sendSuccess(res, { user: toPublicUser(user), token }, 201);
 });
 
 /**
@@ -61,32 +65,33 @@ router.post("/login", async (req: Request, res: Response) => {
 
   const user = db.getUserByEmail(input.email);
   if (!user) {
-    res.status(401).json({ error: "Invalid credentials" });
+    sendError(res, "Invalid credentials", 401);
     return;
   }
 
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) {
-    res.status(401).json({ error: "Invalid credentials" });
+    sendError(res, "Invalid credentials", 401);
     return;
   }
 
   const token = generateToken(user.id, user.role);
   logger.info("User logged in", { userId: user.id });
-  res.json({ user: toPublicUser(user), token });
+  sendSuccess(res, { user: toPublicUser(user), token });
 });
 
 /**
- * GET /users/me
+ * GET /users/profile
  * Get the current authenticated user's profile.
+ * (Renamed from /users/me → /users/profile in v2)
  */
-router.get("/me", authenticate, (req: AuthRequest, res: Response) => {
+router.get("/profile", authenticate, (req: AuthRequest, res: Response) => {
   const user = db.getUserById(req.userId!);
   if (!user) {
-    res.status(404).json({ error: "User not found" });
+    sendError(res, "User not found", 404);
     return;
   }
-  res.json(toPublicUser(user));
+  sendSuccess(res, toPublicUser(user));
 });
 
 /**
@@ -95,21 +100,22 @@ router.get("/me", authenticate, (req: AuthRequest, res: Response) => {
  */
 router.get("/", authenticate, requireAdmin, (_req: AuthRequest, res: Response) => {
   const users = db.getAllUsers().map(toPublicUser);
-  res.json(users);
+  sendSuccess(res, users);
 });
 
 /**
  * DELETE /users/:id
- * Delete a user (admin only).
+ * Delete a user (admin only). Now returns the deleted user instead of 204.
  */
 router.delete("/:id", authenticate, requireAdmin, (req: AuthRequest, res: Response) => {
-  const deleted = db.deleteUser(req.params.id);
-  if (!deleted) {
-    res.status(404).json({ error: "User not found" });
+  const user = db.getUserById(req.params.id);
+  if (!user) {
+    sendError(res, "User not found", 404);
     return;
   }
+  db.deleteUser(req.params.id);
   logger.info("User deleted", { userId: req.params.id, deletedBy: req.userId });
-  res.status(204).send();
+  sendSuccess(res, toPublicUser(user));
 });
 
 export default router;

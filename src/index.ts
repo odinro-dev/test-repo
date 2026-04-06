@@ -15,9 +15,23 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("combined"));
 
-// Routes
-app.use("/api/tasks", taskRoutes);
-app.use("/api/users", userRoutes);
+// Routes — v2 API
+app.use("/api/v2/tasks", taskRoutes);
+app.use("/api/v2/users", userRoutes);
+
+// Deprecated v1 routes — redirect to v2
+app.use("/api/tasks", (_req, res) => {
+  res.status(301).json({
+    error: "This endpoint has moved to /api/v2/tasks",
+    migration: "https://github.com/odinro-dev/test-repo/wiki/API-v2-Migration",
+  });
+});
+app.use("/api/users", (_req, res) => {
+  res.status(301).json({
+    error: "This endpoint has moved to /api/v2/users",
+    migration: "https://github.com/odinro-dev/test-repo/wiki/API-v2-Migration",
+  });
+});
 
 // Health check
 app.get("/health", (_req, res) => {
