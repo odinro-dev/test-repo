@@ -65,16 +65,25 @@ class Database {
     return this.users.delete(id);
   }
 
-  // Pagination helper
-  paginate<T>(items: T[], page: number, limit: number): { data: T[]; total: number; page: number; totalPages: number } {
+  // Pagination helper — uses stable sort by createdAt+id to prevent
+  // duplicates when items are inserted between page fetches.
+  paginate<T extends { createdAt: string; id: string }>(
+    items: T[],
+    page: number,
+    limit: number
+  ): { data: T[]; total: number; page: number; totalPages: number } {
+    const sorted = [...items].sort((a, b) => {
+      const cmp = a.createdAt.localeCompare(b.createdAt);
+      return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
+    });
     const start = (page - 1) * limit;
     const end = start + limit;
-    const data = items.slice(start, end);
+    const data = sorted.slice(start, end);
     return {
       data,
-      total: items.length,
+      total: sorted.length,
       page,
-      totalPages: Math.ceil(items.length / limit),
+      totalPages: Math.ceil(sorted.length / limit),
     };
   }
 }
