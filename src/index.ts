@@ -21,7 +21,12 @@ app.use("/api/users", userRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || "unknown",
+    nodeVersion: process.version,
+  });
 });
 
 // 404 handler
