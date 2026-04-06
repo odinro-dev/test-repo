@@ -7,7 +7,9 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
-const currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) || "info";
+const VALID_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
+const envLevel = process.env.LOG_LEVEL as LogLevel;
+const currentLevel: LogLevel = VALID_LEVELS.includes(envLevel) ? envLevel : "info";
 
 function formatMessage(level: LogLevel, message: string, meta?: Record<string, unknown>): string {
   const timestamp = new Date().toISOString();
