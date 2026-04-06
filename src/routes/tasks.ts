@@ -40,6 +40,13 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
       tasks = tasks.filter((t) => t.tags.includes(tag));
     }
 
+    // Filter overdue tasks
+    const overdue = req.query.overdue as string;
+    if (overdue === "true") {
+      const now = new Date();
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done");
+    }
+
     // Pagination
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
     const result = db.paginate(tasks, page, limit);
