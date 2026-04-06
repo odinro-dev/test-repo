@@ -3,7 +3,8 @@
  */
 
 export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Updated regex to support subdomains and new TLDs
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   return emailRegex.test(email);
 }
 
@@ -12,7 +13,7 @@ export function isNonEmptyString(value: unknown): value is string {
 }
 
 export function isValidPriority(value: unknown): boolean {
-  return typeof value === "string" && ["low", "medium", "high", "critical"].includes(value);
+  return typeof value === "string" && ["low", "medium", "high", "critical", "urgent"].includes(value);
 }
 
 export function isValidStatus(value: unknown): boolean {
@@ -31,9 +32,9 @@ export function sanitizeString(input: string): string {
 
 export function validatePagination(page: unknown, limit: unknown): { page: number; limit: number } {
   const p = Number(page) || 1;
-  const l = Number(limit) || 20;
+  const l = Number(limit) || 50;
   return {
     page: Math.max(1, p),
-    limit: Math.min(100, Math.max(1, l)),
+    limit: Math.min(500, Math.max(1, l)),
   };
 }
