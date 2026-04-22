@@ -4,6 +4,7 @@ import { db } from "../db";
 import { CreateTaskInput, UpdateTaskInput, Task } from "../models/task";
 import { AuthRequest, authenticate } from "../middleware/auth";
 import { isNonEmptyString, isValidPriority, isValidStatus, validatePagination, sanitizeString } from "../utils/validation";
+import { sendSuccess, sendError, sendPaginated } from "../utils/response";
 import { logger } from "../utils/logger";
 
 const router = Router();
@@ -11,6 +12,9 @@ const router = Router();
 /**
  * GET /tasks
  * List all tasks with optional filters and pagination.
+ *
+ * Response format (v2):
+ * { success: true, data: [...], pagination: {...}, meta: {...} }
  */
 router.get("/", authenticate, (req: AuthRequest, res: Response) => {
   try {
@@ -29,9 +33,9 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
     }
 
     // Filter by assignee
-    const assignee = req.query.assignee as string;
-    if (assignee) {
-      tasks = tasks.filter((t) => t.assigneeId === assignee);
+    const assigneeId = req.query.assigneeId as string;
+    if (assigneeId) {
+      tasks = tasks.filter((t) => t.assigneeId === assigneeId);
     }
 
     // Filter by tag
@@ -44,11 +48,16 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
     const result = db.paginate(tasks, page, limit);
 
-    logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag } });
-    res.json(result);
+    logger.info("Tasks listed", { count: result.data.length, page });
+    sendPaginated(res, result.data, {
+      total: result.total,
+      page: result.page,
+      totalPages: result.totalPages,
+      limit,
+    });
   } catch (error) {
     logger.error("Failed to list tasks", { error: (error as Error).message });
-    res.status(500).json({ error: "Internal server error" });
+    sendError(res, "Internal server error");
   }
 });
 
@@ -59,10 +68,10 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
 router.get("/:id", authenticate, (req: AuthRequest, res: Response) => {
   const task = db.getTaskById(req.params.id);
   if (!task) {
-    res.status(404).json({ error: "Task not found" });
+    sendError(res, "Task not found", 404);
     return;
   }
-  res.json(task);
+  sendSuccess(res, task);
 });
 
 /**
@@ -73,12 +82,12 @@ router.post("/", authenticate, (req: AuthRequest, res: Response) => {
   const input: CreateTaskInput = req.body;
 
   if (!isNonEmptyString(input.title)) {
-    res.status(400).json({ error: "Title is required" });
+    sendError(res, "Title is required", 400);
     return;
   }
 
   if (input.priority && !isValidPriority(input.priority)) {
-    res.status(400).json({ error: "Invalid priority value" });
+    sendError(res, "Invalid priority. Must be one of: low, medium, high, critical", 400);
     return;
   }
 
@@ -98,49 +107,50 @@ router.post("/", authenticate, (req: AuthRequest, res: Response) => {
 
   db.createTask(task);
   logger.info("Task created", { taskId: task.id, title: task.title });
-  res.status(201).json(task);
+  sendSuccess(res, task, 201);
 });
 
 /**
- * PATCH /tasks/:id
- * Update an existing task.
+ * PUT /tasks/:id
+ * Full update of an existing task (replaces PATCH).
  */
-router.patch("/:id", authenticate, (req: AuthRequest, res: Response) => {
+router.put("/:id", authenticate, (req: AuthRequest, res: Response) => {
   const existing = db.getTaskById(req.params.id);
   if (!existing) {
-    res.status(404).json({ error: "Task not found" });
+    sendError(res, "Task not found", 404);
     return;
   }
 
   const input: UpdateTaskInput = req.body;
 
   if (input.status && !isValidStatus(input.status)) {
-    res.status(400).json({ error: "Invalid status value" });
+    sendError(res, "Invalid status. Must be one of: todo, in_progress, done, cancelled", 400);
     return;
   }
 
   if (input.priority && !isValidPriority(input.priority)) {
-    res.status(400).json({ error: "Invalid priority value" });
+    sendError(res, "Invalid priority. Must be one of: low, medium, high, critical", 400);
     return;
   }
 
   const updated = db.updateTask(req.params.id, input);
   logger.info("Task updated", { taskId: req.params.id });
-  res.json(updated);
+  sendSuccess(res, updated);
 });
 
 /**
  * DELETE /tasks/:id
- * Delete a task.
+ * Delete a task. Returns the deleted task in the response.
  */
 router.delete("/:id", authenticate, (req: AuthRequest, res: Response) => {
-  const deleted = db.deleteTask(req.params.id);
-  if (!deleted) {
-    res.status(404).json({ error: "Task not found" });
+  const task = db.getTaskById(req.params.id);
+  if (!task) {
+    sendError(res, "Task not found", 404);
     return;
   }
+  db.deleteTask(req.params.id);
   logger.info("Task deleted", { taskId: req.params.id });
-  res.status(204).send();
+  sendSuccess(res, task);
 });
 
 export default router;
