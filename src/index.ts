@@ -43,7 +43,19 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 app.listen(PORT, () => {
-  logger.info(`Server started on port ${PORT}`);
+  // Banner on boot — easier to eyeball in shared staging logs where several
+  // services share stdout; the timestamp also anchors "when did this come up"
+  // for incident triage.
+  const banner = [
+    "",
+    "================================================",
+    `  Task Manager API`,
+    `  port=${PORT}  env=${process.env.NODE_ENV ?? "development"}`,
+    `  started=${new Date().toISOString()}`,
+    "================================================",
+    "",
+  ].join("\n");
+  logger.info(banner);
 });
 
 export default app;
