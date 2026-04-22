@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import taskRoutes from "./routes/tasks";
 import userRoutes from "./routes/users";
+import adminRoutes from "./routes/admin";
 import { logger } from "./utils/logger";
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(morgan("combined"));
 // Routes
 app.use("/api/tasks", taskRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
