@@ -40,11 +40,27 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
       tasks = tasks.filter((t) => t.tags.includes(tag));
     }
 
+    // Filter overdue tasks
+    const overdue = req.query.overdue as string;
+    if (overdue === "true") {
+      const now = new Date();
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done" && t.status !== "cancelled");
+    }
+
+    // Filter tasks due soon
+    const dueSoon = req.query.dueSoon as string;
+    if (dueSoon) {
+      const days = parseInt(dueSoon, 10) || 3;
+      const now = new Date();
+      const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) >= now && new Date(t.dueDate) <= cutoff);
+    }
+
     // Pagination
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
     const result = db.paginate(tasks, page, limit);
 
-    logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag } });
+    logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag, overdue, dueSoon } });
     res.json(result);
   } catch (error) {
     logger.error("Failed to list tasks", { error: (error as Error).message });
