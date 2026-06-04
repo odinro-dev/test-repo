@@ -14,35 +14,16 @@ const router = Router();
  */
 router.get("/", authenticate, (req: AuthRequest, res: Response) => {
   try {
-    let tasks = db.getAllTasks();
-
-    // Filter by status
     const status = req.query.status as string;
-    if (status) {
-      tasks = tasks.filter((t) => t.status === status);
-    }
-
-    // Filter by priority
     const priority = req.query.priority as string;
-    if (priority) {
-      tasks = tasks.filter((t) => t.priority === priority);
-    }
-
-    // Filter by assignee
     const assignee = req.query.assignee as string;
-    if (assignee) {
-      tasks = tasks.filter((t) => t.assigneeId === assignee);
-    }
-
-    // Filter by tag
     const tag = req.query.tag as string;
-    if (tag) {
-      tasks = tasks.filter((t) => t.tags.includes(tag));
-    }
-
-    // Pagination
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
-    const result = db.paginate(tasks, page, limit);
+
+    // Filter + paginate inside the data layer so a request only materializes the
+    // page it returns, instead of copying the whole task collection per request
+    // (the O(N)-per-request allocation behind issue #34).
+    const result = db.queryTasks({ status, priority, assignee, tag, page, limit });
 
     logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag } });
     res.json(result);

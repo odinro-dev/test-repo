@@ -1,6 +1,15 @@
 import { Task } from "./models/task";
 import { User } from "./models/user";
 
+export interface TaskQuery {
+  status?: string;
+  priority?: string;
+  assignee?: string;
+  tag?: string;
+  page: number;
+  limit: number;
+}
+
 /**
  * Simple in-memory database for development.
  * In production, replace with PostgreSQL or MongoDB.
@@ -18,12 +27,47 @@ class Database {
     return this.tasks.get(id);
   }
 
+  /**
+   * Filter and paginate tasks in a single pass over the task map.
+   *
+   * Unlike getAllTasks().filter(...).slice(...), this never materializes the
+   * full collection per request — it only collects the requested page window
+   * (<= limit items) plus a running match count. That keeps per-request
+   * allocation at O(page_size) instead of O(total_tasks), which is what was
+   * exhausting the heap under sustained list traffic (issue #34).
+   */
+  queryTasks(query: TaskQuery): { data: Task[]; total: number; page: number; totalPages: number } {
+    const { status, priority, assignee, tag, page, limit } = query;
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    const data: Task[] = [];
+    let total = 0;
+    for (const task of this.tasks.values()) {
+      if (status && task.status !== status) continue;
+      if (priority && task.priority !== priority) continue;
+      if (assignee && task.assigneeId !== assignee) continue;
+      if (tag && !task.tags.includes(tag)) continue;
+      // Only the rows on the requested page are retained in memory.
+      if (total >= start && total < end) data.push(task);
+      total++;
+    }
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
   getTasksByStatus(status: string): Task[] {
-    return this.getAllTasks().filter((t) => t.status === status);
+    const result: Task[] = [];
+    for (const task of this.tasks.values()) {
+      if (task.status === status) result.push(task);
+    }
+    return result;
   }
 
   getTasksByAssignee(assigneeId: string): Task[] {
-    return this.getAllTasks().filter((t) => t.assigneeId === assigneeId);
+    const result: Task[] = [];
+    for (const task of this.tasks.values()) {
+      if (task.assigneeId === assigneeId) result.push(task);
+    }
+    return result;
   }
 
   createTask(task: Task): Task {

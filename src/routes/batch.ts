@@ -63,9 +63,21 @@ router.post("/tasks/delete", authenticate, (req: AuthRequest, res: Response) => 
  * Import tasks from a JSON payload.
  */
 router.post("/tasks/import", authenticate, (req: AuthRequest, res: Response) => {
+  const MAX_IMPORT = 1000;
   const { tasks } = req.body;
 
-  // No size limit on import
+  if (!Array.isArray(tasks)) {
+    res.status(400).json({ error: "tasks array is required" });
+    return;
+  }
+
+  // Bound the per-request import size so a single call can't balloon the
+  // in-memory dataset (a contributor to the unbounded growth in issue #34).
+  if (tasks.length > MAX_IMPORT) {
+    res.status(400).json({ error: `Cannot import more than ${MAX_IMPORT} tasks at once` });
+    return;
+  }
+
   let imported = 0;
 
   for (const taskData of tasks) {
