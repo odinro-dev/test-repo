@@ -4,13 +4,23 @@ import { db } from "../db";
 import { CreateTaskInput, UpdateTaskInput, Task } from "../models/task";
 import { AuthRequest, authenticate } from "../middleware/auth";
 import { isNonEmptyString, isValidPriority, isValidStatus, validatePagination, sanitizeString } from "../utils/validation";
+import { decodeCursor, Cursor } from "../utils/cursor";
 import { logger } from "../utils/logger";
 
 const router = Router();
 
 /**
  * GET /tasks
- * List all tasks with optional filters and pagination.
+ * List tasks with optional filters and pagination.
+ *
+ * Two pagination modes (both filter + page inside the data layer so a request
+ * only materializes the page it returns — issue #34):
+ *   - Offset (default): `?page=&limit=`. Backward compatible; now ordered by a
+ *     stable (createdAt, id) key so results are deterministic.
+ *   - Cursor (recommended): `?cursor=&limit=`. Keyset pagination that returns
+ *     each task exactly once even when tasks are created/deleted mid-traversal
+ *     (issue #1). Pass back the `nextCursor` from the previous response; a null
+ *     `nextCursor` means the last page.
  */
 router.get("/", authenticate, (req: AuthRequest, res: Response) => {
   try {
@@ -20,11 +30,30 @@ router.get("/", authenticate, (req: AuthRequest, res: Response) => {
     const tag = req.query.tag as string;
     const { page, limit } = validatePagination(req.query.page, req.query.limit);
 
-    // Filter + paginate inside the data layer so a request only materializes the
-    // page it returns, instead of copying the whole task collection per request
-    // (the O(N)-per-request allocation behind issue #34).
-    const result = db.queryTasks({ status, priority, assignee, tag, page, limit });
+    // Cursor mode is selected by the presence of the `cursor` param. An empty
+    // value (`?cursor=`) means "start from the beginning" in cursor mode.
+    const rawCursor = req.query.cursor;
+    if (rawCursor !== undefined) {
+      if (typeof rawCursor !== "string") {
+        res.status(400).json({ error: "Invalid cursor" });
+        return;
+      }
+      let cursor: Cursor | undefined;
+      if (rawCursor !== "") {
+        const decoded = decodeCursor(rawCursor);
+        if (!decoded) {
+          res.status(400).json({ error: "Invalid cursor" });
+          return;
+        }
+        cursor = decoded;
+      }
+      const result = db.queryTasksByCursor({ status, priority, assignee, tag, limit, cursor });
+      logger.info("Tasks listed (cursor)", { count: result.data.length, filters: { status, priority, assignee, tag } });
+      res.json(result);
+      return;
+    }
 
+    const result = db.queryTasks({ status, priority, assignee, tag, page, limit });
     logger.info("Tasks listed", { count: result.data.length, page, filters: { status, priority, assignee, tag } });
     res.json(result);
   } catch (error) {
