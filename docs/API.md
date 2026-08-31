@@ -96,8 +96,28 @@ curl -H "Authorization: Bearer $TOKEN" \
   ],
   "total": 1,
   "page": 1,
-  "totalPages": 1
+  "totalPages": 1,
+  "nextCursor": null
 }
+```
+
+**Pagination**
+
+`GET /api/tasks` supports two modes:
+
+- **Offset** (default): `?page=<n>&limit=<n>` (default `limit=20`, max `100`). Results are ordered by a stable `(createdAt, id)` key, so each page is deterministic. Offset paging is convenient, but it can still skip a row if tasks are *deleted* while you page through the list — prefer cursor paging for full traversals.
+- **Cursor** (recommended for full traversals): `?cursor=<nextCursor>&limit=<n>`. Every response includes a `nextCursor`; pass it on the next request to fetch the rows immediately after the last one you received. A `null` `nextCursor` means you've reached the end. Because each page is anchored to a row key rather than a numeric offset, every task is returned exactly once even when tasks are created or deleted between requests.
+
+```bash
+# Walk the entire list safely with cursor pagination
+cursor=""
+while :; do
+  resp=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "http://localhost:3000/api/tasks?limit=10&cursor=$cursor")
+  echo "$resp" | jq '.data[].id'
+  cursor=$(echo "$resp" | jq -r '.nextCursor // empty')
+  [ -z "$cursor" ] && break
+done
 ```
 
 ### Create Task
