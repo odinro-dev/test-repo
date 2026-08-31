@@ -26,7 +26,12 @@ export function isValidDate(value: unknown): boolean {
 }
 
 export function sanitizeString(input: string): string {
-  return input.trim().replace(/[<>]/g, "");
+  return input
+    .trim()
+    .replace(/[<>]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 }
 
 export function validatePagination(page: unknown, limit: unknown): { page: number; limit: number } {
